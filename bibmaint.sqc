@@ -1,0 +1,579 @@
+#include <iostream>
+#include <vector>
+#include <string.h>
+#include <string>
+#include <stdlib.h> 
+#include <stdio.h>
+#include <sstream>
+#include "util.h"
+
+using namespace std;
+
+EXEC SQL INCLUDE SQLCA;
+
+int main(int argc, char *argv[]) {
+	
+	vector<int> author;
+	
+	//declare
+	EXEC SQL BEGIN DECLARE SECTION;
+		char db[6] = "cs348";
+		int aid;
+		char name[23];
+		char url[43];
+		char pubid[11];
+		char title[71];
+		char publisher[51];	
+		int year;	
+		int volume;
+		int number;
+		char appearsin[11];
+		int startpage;
+		int endpage;		
+		short int indc;
+		int aorder;
+	EXEC SQL END DECLARE SECTION;
+	
+	//EXEC SQL WHENEVER SQLERROR GOTO error;
+
+	EXEC SQL CONNECT TO :db;
+	
+	string input;
+	while(getline(cin, input)){
+		indc = -1;
+		
+		int index = input.find("(");
+		
+		if(index == string::npos) {
+		cout << "invalid command" << endl;
+		return(0);
+		}
+		
+		string data = input.substr(0,index);
+		string rest = input.substr(index);
+		
+
+		
+		if(data == "author") {
+			int h1 = rest.find("#");
+			string a = rest.substr(1,h1);
+			istringstream buffer(a);
+			buffer >> aid;
+			string n = rest.substr(h1+1,rest.length()-h1-2);
+			strcpy(name, n.c_str());
+	
+			EXEC SQL
+				select a.aid into :aid :indc
+				from author a
+				where a.aid = :aid;
+			
+			if(indc < 0) {
+				EXEC SQL
+					insert into author (aid, name)
+						values (:aid, :name);
+				if( SQLCODE < 0 ) { return( -1 ); } /* error */
+				else if(SQLCODE==100){printf("insert author failed");}
+				else cout << "insert author success" << endl;
+			} else {
+				EXEC SQL 
+					update author
+					set name = :name
+					where aid = :aid;
+				if( SQLCODE < 0 ) { return( -1 ); } /* error */
+				else if(SQLCODE==100){printf("update author failed");}
+				else cout << "update author success" << endl;
+			} 
+			continue;
+		}
+		
+		if(data == "authorurl") {
+			int h1 = rest.find("#");
+			string a = rest.substr(1,h1);
+			istringstream buffer(a);
+			buffer >> aid;
+			string u = rest.substr(h1+1,rest.length()-h1-2);
+			strcpy(url, u.c_str());
+			
+			EXEC SQL
+				select a.aid into :aid :indc
+				from author a
+				where a.aid = :aid;
+			
+			if(indc < 0) {
+				EXEC SQL
+					insert into author (aid, url)
+						values (:aid, :url);
+				if( SQLCODE < 0 ) { return( -1 ); } /* error */
+				else if(SQLCODE==100){printf("--insert authorurl failed--");}
+				else cout << "--insert authorurl success--" << endl;
+			} else {
+				EXEC SQL 
+					update author
+					set url = :url
+					where aid = :aid;
+				if( SQLCODE < 0 ) { return( -1 ); } /* error */
+				else if(SQLCODE==100){printf("--update authorurl failed--");}
+				else cout << "--update authorurl success--" << endl;				
+			}
+			continue;			
+			//cout << aid << " " << url << endl;
+		}
+		
+		if(data == "journal") {
+			int h1 = rest.find("#");
+			string p = rest.substr(1,h1-1);
+			strcpy(pubid, p.c_str());
+			rest = rest.substr(h1+1);
+			int h2 = rest.find("#");
+			string t = rest.substr(0,h2);
+			strcpy(title, t.c_str());
+			rest = rest.substr(h2+1);
+			int h3 = rest.find("#");
+			string v = rest.substr(0,h3);
+			istringstream buffer1(v);
+			buffer1 >> volume;
+			rest = rest.substr(h3+1);
+			int h4 = rest.find("#");
+			string n = rest.substr(0,h4);
+			istringstream buffer2(n);
+			buffer2 >> number;
+			string y = rest.substr(h4+1,rest.length()-h4-2);
+			istringstream buffer3(y);
+			buffer3 >> year;
+			//cout << pubid << " " << title << " " << volume << " " << number << " " << year << endl;
+			
+			EXEC SQL
+				select pubid into :pubid :indc
+				from journal
+				where pubid = :pubid;
+			
+			if(indc < 0) {
+				EXEC SQL
+					insert into publication (pubid, title)
+						values (:pubid, :title);
+				EXEC SQL
+					insert into journal (pubid, volume, number, year)
+						values (:pubid, :volume, :number, :year);
+				if( SQLCODE < 0 ) { return( -1 ); } /* error */
+				else if(SQLCODE==100){printf("--insert journal failed--");}
+				else {
+					cout << "--insert journal success--" << endl;
+					cout << "Pubid: " << pubid << endl;
+					cout << "Type: journal" << endl;
+					cout << "Title: " << title << endl;
+					cout << "Volume: " << volume << endl;
+					cout << "Number: " << number << endl;
+					cout << "Year: " << year << endl;					
+				}
+			} else {
+				EXEC SQL 
+					update publication
+					set title = :title
+					where pubid = :pubid;
+				EXEC SQL 
+					update journal
+					set volume = :volume, number = :number, year = :year
+					where pubid = :pubid;
+				if( SQLCODE < 0 ) { return( -1 ); } /* error */
+				else if(SQLCODE==100){printf("--update journal failed--");}
+				else {
+					cout << "--update journal success--" << endl;
+					cout << "Pubid: " << pubid << endl;
+					cout << "Type: journal" << endl;
+					cout << "Title: " << title << endl;
+					cout << "Volume: " << volume << endl;
+					cout << "Number: " << number << endl;
+					cout << "Year: " << year << endl;
+				}			
+			}
+			continue;
+		
+		}
+		
+		if(data == "proceedings") {
+			int h1 = rest.find("#");
+			string p = rest.substr(1,h1-1);
+			strcpy(pubid, p.c_str());
+			rest = rest.substr(h1+1);
+			int h2 = rest.find("#");
+			string t = rest.substr(0,h2);
+			strcpy(title, t.c_str());
+			string y = rest.substr(h2+1,rest.length()-h2-2);
+			istringstream buffer(y);
+			buffer >> year;
+		
+			EXEC SQL
+				select p.pubid into :pubid :indc
+				from proceedings p
+				where p.pubid = :pubid;
+			
+			if(indc < 0) {
+				EXEC SQL
+					insert into publication (pubid, title)
+						values (:pubid,  :title);
+				EXEC SQL
+					insert into proceedings (pubid, year)
+						values (:pubid, :year);
+				if( SQLCODE < 0 ) { return( -1 ); } /* error */
+				else if(SQLCODE==100){printf("--insert proceedings failed--");}
+				else {
+					cout << "--insert proceedings success--" << endl;
+					cout << "Pubid: " << pubid << endl;
+					cout << "Type: proceedings" << endl;
+					cout << "Title: " << title << endl;
+					cout << "Year: " << year << endl;					
+				}
+			} else {
+				EXEC SQL 
+					update publication
+					set title = :title
+					where pubid = :pubid;
+				EXEC SQL 
+					update proceedings
+					set year = :year
+					where pubid = :pubid;
+				if( SQLCODE < 0 ) { return( -1 ); } /* error */
+				else if(SQLCODE==100){printf("--update proceedings failed--");}
+				else {
+					cout << "--update proceedings success--" << endl;
+					cout << "Pubid: " << pubid << endl;
+					cout << "Type: proceedings" << endl;
+					cout << "Title: " << title << endl;
+					cout << "Year: " << year << endl;
+				}			
+			}
+			continue;
+		}
+		
+		if(data == "article") {
+			//article(pubid#title#aid1;...;aidk#appearsin#startpage#endpage)
+			//pubid
+			int h1 = rest.find("#");
+			string p = rest.substr(1,h1-1);
+			strcpy(pubid, p.c_str());
+			rest = rest.substr(h1+1);
+			//title
+			int h2 = rest.find("#");
+			string t = rest.substr(0,h2);
+			strcpy(title, t.c_str());
+			rest = rest.substr(h2+1);
+			//aid loop
+			while(rest.find(";") != -1) {
+				int s = rest.find(";");
+				string au_s = rest.substr(0,s);
+				int au;
+				istringstream buffer(au_s);
+				buffer >> au;
+				author.push_back(au);
+				rest = rest.substr(s+1);
+			}
+			
+			int h3 = rest.find("#");
+			string au_last = rest.substr(0,h3);
+			int au;
+			istringstream buffer1(au_last);
+			buffer1 >> au;
+			author.push_back(au);
+			rest = rest.substr(h3+1);
+			
+			
+			//appearsin
+			int h4 = rest.find("#");
+			string appear = rest.substr(0,h4);
+			strcpy(appearsin, appear.c_str());
+			rest = rest.substr(h4+1);
+			
+			//startpage
+			int h5 = rest.find("#");
+			string start = rest.substr(0,h5);
+			istringstream buffer2(start);
+			buffer2 >> startpage;
+			string end = rest.substr(h5+1,rest.length() - h5 -2);
+			istringstream buffer3(end);
+			buffer3 >> endpage;
+			
+			/*
+			cout << pubid << endl;
+			cout << title << endl;
+			cout << startpage << endl;
+			cout << endpage << endl;
+			cout << appearsin << endl;
+			for(int i=0; i<author.size(); i++) {
+				cout << author[i] << endl;
+			}
+			*/
+			
+			EXEC SQL
+				select pubid into :pubid :indc
+				from article
+				where pubid = :pubid;
+			if(indc < 0) {
+				
+				EXEC SQL
+					insert into publication (pubid, title)
+						values (:pubid, :title);
+				if( SQLCODE < 0 ) { 
+					cout << "11111111" << endl;
+				}
+				
+				EXEC SQL
+					delete wrote
+					where pubid = :pubid;
+				//aid vecotr		
+				for(int i=0; i<author.size();i++) {
+					aid = author[i];
+					aorder = i+1;
+					EXEC SQL
+						insert into wrote (aid, pubid, aorder) 
+						values (:aid, :pubid, :aorder);
+				}
+				
+				//cout << pubid << endl;
+				//cout << startpage << endl;
+				//cout << endpage << endl;
+				//cout << appearsin << endl;
+				EXEC SQL
+					insert into article (pubid, appearsin, startpage, endpage) 
+						values (:pubid, :appearsin, :startpage, :endpage);			
+				if( SQLCODE < 0 ) {
+					cout << "22222222222222" << endl;
+					return( -1 ); 
+				} /* error */
+				else if(SQLCODE==100){
+					printf("--insert article failed--");
+				}
+				else {
+					cout << "--insert article success--" << endl;
+					cout << "Pubid: " << pubid << endl;
+					cout << "Type: article" << endl;
+					cout << "Title: " << title << endl;
+					cout << "Authors: ";
+					for(int i=0; i<author.size(); i++) {
+						aid = author[i];
+						EXEC SQL 
+							select name into :name
+							from author
+							where aid = :aid;
+						cout << name << ",";
+							
+					}
+					cout << endl;
+					cout << "In: " << appearsin << endl;
+					cout << "Pages: " << startpage << "--" << endpage << endl;
+				}
+			} else {
+				EXEC SQL
+					update publication
+					set title = :title
+					where pubid = :pubid;
+				//aid vecotr		
+				for(int i=0; i<author.size();i++) {
+					aid = author[i];
+					aorder = i+1;
+					EXEC SQL
+						update wrote
+						set aorder = :aorder
+						where aid = :aid and
+							pubid = :pubid;
+				}
+				EXEC SQL
+					update article
+					set appearsin = :appearsin, startpage = :startpage, endpage = :endpage
+					where pubid = :pubid;
+				if( SQLCODE < 0 ) { return( -1 ); } /* error */
+				else if(SQLCODE==100){printf("--update article failed--");}
+				else {
+					cout << "--update article success--" << endl;
+					cout << "Pubid: " << pubid << endl;
+					cout << "Type: article" << endl;
+					cout << "Title: " << title << endl;
+					cout << "Authors: ";
+					for(int i=0; i<author.size(); i++) {
+						aid = author[i];
+						EXEC SQL 
+							select name into :name
+							from author
+							where aid = :aid;
+						cout << name << ",";
+					}
+					cout << endl;
+					cout << "In: " << appearsin << endl;
+					cout << "Pages: " << startpage << "--" << endpage << endl;
+				}
+			}
+			author.clear();
+			continue;
+		}
+		
+		if(data == "book") {
+			//article(pubid#title#aid1;...;aidk#appearsin#startpage#endpage)
+			//pubid
+			int h1 = rest.find("#");
+			string p = rest.substr(1,h1-1);
+			strcpy(pubid, p.c_str());
+			rest = rest.substr(h1+1);
+			//title
+			int h2 = rest.find("#");
+			string t = rest.substr(0,h2);
+			strcpy(title, t.c_str());
+			rest = rest.substr(h2+1);
+			//aid loop
+			while(rest.find(";") != -1) {
+				int s = rest.find(";");
+				string au_s = rest.substr(0,s);
+				int au;
+				istringstream buffer(au_s);
+				buffer >> au;
+				author.push_back(au);
+				rest = rest.substr(s+1);
+			}
+			
+			int h3 = rest.find("#");
+			string au_last = rest.substr(0,h3);
+			int au;
+			istringstream buffer1(au_last);
+			buffer1 >> au;
+			author.push_back(au);
+			rest = rest.substr(h3+1);
+			
+			//startpage
+			int h5 = rest.find("#");
+			string pub = rest.substr(0,h5);
+			strcpy(publisher, pub.c_str());
+			string y = rest.substr(h5+1,rest.length() - h5 -2);
+			istringstream buffer3(y);
+			buffer3 >> year;
+			
+			/*
+			cout << pubid << endl;
+			cout << title << endl;
+			cout << publisher << endl;
+			cout << year << endl;
+			
+			for(int i=0; i<author.size(); i++) {
+				cout << author[i] << endl;
+			}
+			*/
+			
+			
+			EXEC SQL
+				select pubid into :pubid :indc
+				from book
+				where pubid = :pubid;
+			if(indc < 0) {
+				
+				EXEC SQL
+					insert into publication (pubid, title)
+						values (:pubid, :title);
+				if( SQLCODE < 0 ) { 
+					cout << "11111111" << endl;
+				}
+				
+				//aid vecotr		
+				EXEC SQL
+					delete wrote
+					where pubid = :pubid;
+				//aid vecotr		
+				for(int i=0; i<author.size();i++) {
+					aid = author[i];
+					aorder = i+1;
+					EXEC SQL
+						insert into wrote (aid, pubid, aorder) 
+						values (:aid, :pubid, :aorder);
+				}
+				
+				//cout << pubid << endl;
+				//cout << startpage << endl;
+				//cout << endpage << endl;
+				//cout << appearsin << endl;
+				EXEC SQL
+					insert into book (pubid, publisher, year) 
+						values (:pubid, :publisher, :year);			
+				if( SQLCODE < 0 ) {
+					cout << "22222222222222" << endl;
+					return( -1 ); 
+				} 
+				else if(SQLCODE==100){
+					printf("--insert book failed--");
+				}
+				else {
+					cout << "--insert book success--" << endl;
+					cout << "Pubid: " << pubid << endl;
+					cout << "Type: book" << endl;
+					cout << "Title: " << title << endl;						
+					cout << "Authors: ";
+					for(int i=0; i<author.size(); i++) {
+						aid = author[i];
+						EXEC SQL 
+							select name into :name
+							from author
+							where aid = :aid;
+						cout << name << ",";
+							
+					}
+					cout << endl;
+					cout << "Publisher: " << publisher << endl;
+					cout << "Year: " << year << endl;
+				}
+			} else {
+				EXEC SQL
+					update publication
+					set title = :title
+					where pubid = :pubid;
+				//aid vecotr		
+				for(int i=0; i<author.size();i++) {
+					aid = author[i];
+					aorder = i+1;
+					EXEC SQL
+						update wrote
+						set aorder = :aorder
+						where aid = :aid and
+							pubid = :pubid;
+				}
+				EXEC SQL
+					update book
+					set publisher = :publisher, year = :year
+					where pubid = :pubid;
+				if( SQLCODE < 0 ) { return( -1 ); } 
+				else if(SQLCODE==100){printf("--update book failed--");}
+				else {
+					cout << "--update book success--" << endl;
+					cout << "Pubid: " << pubid << endl;
+					cout << "Type: book" << endl;
+					cout << "Title: " << title << endl;						
+					cout << "Authors: ";
+					for(int i=0; i<author.size(); i++) {
+						aid = author[i];
+						EXEC SQL 
+							select name into :name
+							from author
+							where aid = :aid;
+						cout << name << ",";
+							
+					}
+					cout << endl;
+					cout << "Publisher: " << publisher << endl;
+					cout << "Year: " << year << endl;
+					
+				}
+			}
+			author.clear();
+			continue;
+			
+		}
+		
+
+	}
+	
+	EXEC SQL COMMIT;
+	EXEC SQL CONNECT reset;
+	exit(0);
+	
+	error:
+		check_error("My error",&sqlca);
+		EXEC SQL WHENEVER SQLERROR CONTINUE;
+
+		EXEC SQL ROLLBACK;
+		EXEC SQL CONNECT reset;
+		exit(1);	
+}

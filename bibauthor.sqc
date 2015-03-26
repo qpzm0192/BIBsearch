@@ -1,0 +1,263 @@
+#include <iostream>
+#include <vector>
+#include <string.h>
+#include <stdlib.h> 
+#include <stdio.h>
+#include "util.h"
+
+EXEC SQL INCLUDE SQLCA;
+
+using namespace std;
+
+int main(int argc, char *argv[]) {
+	
+	//declare
+	EXEC SQL BEGIN DECLARE SECTION;
+		char db[6] = "cs348";
+		char author[23];
+		char pubid[11];
+		char appearsin[11];
+		int year;
+		char name[23];
+		char title[71];
+		char publisher[51];
+		int volume;
+		int number;
+		char in[11];
+		int startpage;
+		int endpage;
+		short int indc;
+	EXEC SQL END DECLARE SECTION;
+
+	strcpy(author,argv[1]);
+
+
+	EXEC SQL WHENEVER SQLERROR GOTO error;
+
+	EXEC SQL CONNECT TO :db;
+
+	//main sql
+	EXEC SQL DECLARE C1 CURSOR FOR
+		select *
+		from 
+		(
+			--book
+			(select x.pubid, x.year, au.name
+			from wrote w, author au,
+				(select b.pubid, b.year
+				from author au, wrote w, book b
+				where au.name = :author and
+					au.aid = w.aid and
+					w.pubid = b.pubid) as x
+			where x.pubid = w.pubid and
+				w.aorder = 1 and
+				au.aid = w.aid)
+			union
+			
+			--article(proceedings)
+			(select x.pubid, x.year, au.name
+			from author au, wrote w,
+				(select ar.pubid, p.year 
+				from article ar, author au, wrote w, proceedings p 
+				where au.name = :author and 
+					au.aid = w.aid and 
+					w.pubid = ar.pubid and 
+					ar.appearsin = p.pubid) as x
+			where au.aid = w.aid and
+				x.pubid = w.pubid and
+				w.aorder = 1)
+			union
+			
+			--proceedings(article)
+			(select p.pubid, p.year, '' as name
+			from author au, wrote w, article ar, proceedings p
+			where au.name = :author and
+				au.aid = w.aid and
+				w.pubid = ar.pubid and
+				ar.appearsin = p.pubid)
+			union
+			
+			--article(journal)
+			(select x.pubid, x.year, au.name
+			from author au, wrote w,
+				(select ar.pubid, j.year 
+				from article ar, author au, wrote w, journal j 
+				where au.name = :author and 
+					au.aid = w.aid and 
+					w.pubid = ar.pubid and 
+					ar.appearsin = j.pubid) as x
+			where au.aid = w.aid and
+				x.pubid = w.pubid and
+				w.aorder = 1)
+			union
+			
+			--journal(article)
+			(select j.pubid, j.year, '' as name
+			from author au, wrote w, article ar, journal j
+			where au.name = :author and
+				au.aid = w.aid and
+				w.pubid = ar.pubid and
+				ar.appearsin = j.pubid)
+			union
+			
+			--book(article)
+			(select b.pubid, b.year, au.name 
+			from book b, author au, wrote w, 
+				(select ar.appearsin 
+				from article ar, author au, wrote w 
+				where au.name = :author and 
+					au.aid = w.aid and 
+					w.pubid = ar.pubid) as x 
+			where b.pubid = x.appearsin and 
+				au.aid = w.aid and 
+				w.aorder = 1 and 
+				w.pubid = b.pubid)
+			union
+			
+			--article(book)
+			(select x.pubid, x.year, au.name
+			from author au, wrote w,
+				(select ar.pubid, b.year 
+				from article ar, author au, wrote w, book b 
+				where au.name = :author and 
+					au.aid = w.aid and 
+					w.pubid = ar.pubid and 
+					ar.appearsin = b.pubid) as x
+			where au.aid = w.aid and
+				x.pubid = w.pubid and
+				w.aorder = 1)
+			
+
+		)
+		order by year desc, name;
+			
+	EXEC SQL OPEN C1;
+	for(;;) {
+		
+		string type;
+	
+		EXEC SQL FETCH C1 INTO :pubid, :year, :name;
+		if (SQLCODE == 100) { break; }
+		else if (SQLCODE < 0) { break;}
+		
+		
+		//title
+		EXEC SQL 
+			select p.title into :title
+			from publication p
+			where p.pubid = :pubid;
+		
+		//book
+		indc = -1;
+		EXEC SQL 
+			select b.pubid, b.publisher into :pubid, :publisher :indc
+			from book b
+			where b.pubid = :pubid;
+		if(indc >= 0) {
+			type = "book";
+			
+			//author
+			EXEC SQL DECLARE B CURSOR FOR
+				select a.name
+				from author a, wrote w
+				where w.pubid = :pubid and
+					a.aid = w.aid
+				order by w.aorder;
+			
+		}
+		
+		//journal
+		indc = -1;
+		EXEC SQL 
+			select j.pubid, j.volume, j.number into :pubid, :volume, :number :indc
+			from journal j
+			where j.pubid = :pubid;
+		if(indc >= 0) {
+			type = "journal";		
+		}
+		
+		//proceedings
+		indc = -1;
+		EXEC SQL 
+			select p.pubid into :pubid :indc
+			from proceedings p
+			where p.pubid = :pubid;
+		if(indc >= 0) {
+			type = "proceedings";
+		}
+		
+		//article
+		indc = -1;
+		EXEC SQL 
+			select a.pubid, a.appearsin, a.startpage, a.endpage into :pubid, :appearsin, :startpage, :endpage :indc
+			from article a
+			where a.pubid = :pubid;
+		if(indc >= 0) {
+			type = "article";
+			
+			//author
+			EXEC SQL DECLARE A CURSOR FOR
+				select a.name
+				from author a, wrote w
+				where w.pubid = :pubid and
+					a.aid = w.aid
+				order by w.aorder;	
+		}
+		
+		cout << "Pubid: " <<  pubid << endl;
+		cout << "Type: " <<  type << endl;
+		cout << "Title: " << title << endl;
+		if(type == "book") {
+			cout << "Authors: ";
+			EXEC SQL OPEN B;
+			for(;;) {
+				EXEC SQL FETCH B INTO :author;
+				if (SQLCODE == 100) { break; }
+				else if (SQLCODE < 0) { break;}
+				printf(author); 
+				cout << ", ";
+			}
+			cout << endl;
+			EXEC SQL CLOSE B;
+			cout << "Publisher: " << publisher << endl;
+		}
+		
+		if(type == "journal") {
+
+			cout << "Volume: " << volume << endl;
+			cout << "Number: " << number << endl;
+		}
+		
+		if(type == "article") {
+			cout << "Authors: ";
+			EXEC SQL OPEN A;
+			for(;;) {
+				EXEC SQL FETCH A INTO :author;
+				if (SQLCODE == 100) { break; }
+				else if (SQLCODE < 0) { break;}
+				printf(author); 
+				cout << ", " ;
+			}
+			cout << endl;
+			EXEC SQL CLOSE A;
+			cout << "In: " << appearsin << endl;
+			cout << "Pages: " << startpage << "--" << endpage << endl;
+		}
+		
+		cout << "Year: " << year << endl;
+		cout << endl;
+	}
+	EXEC SQL CLOSE C1;
+	
+	EXEC SQL COMMIT;
+	EXEC SQL CONNECT reset;
+	exit(0);
+
+	error:
+		check_error("My error",&sqlca);
+		EXEC SQL WHENEVER SQLERROR CONTINUE;
+
+		EXEC SQL ROLLBACK;
+		EXEC SQL CONNECT reset;
+		exit(1);
+}
